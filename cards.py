@@ -1,7 +1,7 @@
 from utils import SUIT, RANK, ALIGNMENT
 
 
-class Cards:
+class Card:
     suit: SUIT | None
     rank: RANK
     value: int | None
@@ -26,11 +26,11 @@ class Cards:
 
 
 def get_player_cards():
-    cards: list[Cards] = []
+    cards: list[Card] = []
 
     for suit in SUIT:
         for value in range(1, 10 + 1):
-            card = Cards()
+            card = Card()
             card.suit = suit
             card.rank = RANK(str(value)) if value != 1 else RANK.ACE
             card.value = value
@@ -38,7 +38,7 @@ def get_player_cards():
             cards.append(card)
 
     for joker in range(2):
-        card = Cards()
+        card = Card()
         card.suit = None
         card.rank = RANK.JOKER
         card.value = 10
@@ -49,7 +49,7 @@ def get_player_cards():
 
 
 def get_royal_cards():
-    cards: list[Cards] = []
+    cards: list[Card] = []
 
     royal_values = {
         "JACK": 11,
@@ -59,7 +59,7 @@ def get_royal_cards():
 
     for suit in SUIT:
         for name, value in royal_values.items():
-            card = Cards()
+            card = Card()
             card.suit = suit
             card.rank = RANK[name]
             card.value = value
