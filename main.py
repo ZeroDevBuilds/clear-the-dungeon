@@ -23,7 +23,7 @@ class GameOn:
     ROW_STYLE = Style(bgcolor="yellow4")
     ATTACK_STYLE = Style(bgcolor="gold1", color="black")
 
-    MONSTER = "m"
+    ENEMY = "enemy"
     ATTACKS = "attacks"
 
     player_deck: list[Card]
@@ -56,86 +56,112 @@ class GameOn:
 
     def _game_loop(self):
         while True:
-            hand_index, monster_index = self._get_player_action()
+            hand_idx, enemy_idx = self._get_player_action()
+            royal_card = self.dungeon_room[enemy_idx]
             logger.debug(
-                "Player selection, attack card: %s on monster card: %s",
-                self.player_hand[hand_index].to_log(),
-                self.dungeon_room[monster_index].to_log() 
-                if self.dungeon_room[monster_index] else 'None'
+                "Player selection, attack card: %s on royal card: %s",
+                self.player_hand[hand_idx].to_log(),
+                royal_card.to_log() if royal_card else 'None'
             )
 
-            self._turn_end(hand_index, monster_index)
+            self._turn_end(hand_idx, enemy_idx)
             self._display_game_state()
 
     def _get_player_action(self) -> tuple[int, int]:
-        # player hand then monster a card to play by its number (1, 2, 3) or 'q' to quit:
+
         while True:
             input_prompt = "Your turn : "
             user_input = input(input_prompt).strip()
 
-            if user_input == "h":
-                self.console.print("""
-                Help:   
-                Enter the number of the card in your hand followed by the 
-                    number of the monster in the dungeon room you want to attack. 
-                    For example, '1 2' to use your first card on the second monster. 
-                Enter 'd' to discard your hand and draw a new one. 
-                Enter 'q' to quit the game.
-                """)
+            if self._input_is_help(user_input):
                 continue
 
-            if user_input.lower() == "q":
-                self.console.print("Quitting the game. Goodbye!")
+            if self._input_is_quit(user_input):
                 exit(0)
 
-            # discard player hand and get new hand
-            if user_input.lower() == "d":
-                self._replenish_player_hand(discard_hand=True)
-                self._display_game_state()
+            if self._input_is_discard(user_input):
                 continue
 
             actions = user_input.split(" ")
-            if len(actions) != 2:
-                self.console.print(
-                    "Invalid input format. Please enter in the format 'hand# monster#'."
-                )
+            if self._input_is_invalid(actions):
                 continue
-            else:
-                hand_input, monster_input = actions
-                if hand_input in ["1", "2", "3"] and monster_input in ["1", "2", "3", "4",]:
-                    hand_index = int(hand_input) - 1
-                    monster_index = int(monster_input) - 1
-                    if hand_index < len(self.player_hand) and monster_index < len(
-                        self.dungeon_room
-                    ):
-                        return hand_index, monster_index
-                    else:
-                        self.console.print(
-                            "Invalid card or monster number. Please choose valid numbers."
-                        )
-                else:
-                    self.console.print(
-                        "Invalid input. Please enter numbers corresponding to your hand and the dungeon room."
-                    )
 
-    def _turn_end(self, hand_index: int, monster_index: int):
-        if self.dungeon_room[monster_index] is None:
+            # valid input
+            hand_input, enemy_input = actions
+            hand_index = int(hand_input) - 1
+            enemy_index = int(enemy_input) - 1
+            return hand_index, enemy_index
+
+
+    def _input_is_help(self, user_input: str) -> bool:
+        if user_input == "h":
+            self.console.print("""
+            Help:   
+            Enter the number of the card in your hand followed by the 
+                number of the royal in the dungeon room you want to attack. 
+                For example, '1 2' to use your first card on the second royal card. 
+            Enter 'd' to discard your hand and draw a new one. 
+            Enter 'q' to quit the game.
+            """)
+            return True
+        return False
+    
+    def _input_is_quit(self, user_input: str) -> bool:
+        if user_input.lower() == "q":
+            self.console.print("Quitting the game. Goodbye!")
+            return True
+        return False
+
+    def _input_is_discard(self, user_input: str) -> bool:
+        if user_input.lower() == "d":
+            # discard player hand and get new hand
+            self._replenish_player_hand(discard_hand=True)
+
+            self._display_game_state()
+            return True
+        return False
+    
+    def _input_is_invalid(self, inputs: list[str]) -> bool:
+        if len(inputs) != 2:
             self.console.print(
-                f"Monster {monster_index + 1} is already defeated. Choose another monster."
+                "Invalid input format. Please enter in the format 'hand# royal#'."
+            )
+            return True
+        
+        hand_input, enemy_input = inputs
+        if hand_input not in ["1", "2", "3"] or enemy_input not in ["1", "2", "3", "4",]:
+            self.console.print(
+                    "Invalid input. Please enter numbers corresponding to your hand and the dungeon room."
+                )
+            return True
+        
+        hand_index = int(hand_input) - 1
+        enemy_index = int(enemy_input) - 1
+        if hand_index >= len(self.player_hand) or enemy_index >= len(self.dungeon_room):
+            self.console.print(
+                    "Invalid player or royal number. Please choose valid numbers."
+                )
+            return True
+        return False
+
+    def _turn_end(self, hand_index: int, enemy_index: int):
+        if self.dungeon_room[enemy_index] is None:
+            self.console.print(
+                f"Royal {enemy_index + 1} is already defeated. Choose another royal."
             )
             return
         
-        state_key = str(monster_index + 1)
+        state_key = str(enemy_index + 1)
         curr_game_state = self.game_state[state_key]
         attack_stage = len(curr_game_state[GameOn.ATTACKS])
 
         match attack_stage:
             case 0:
-                self._do_first_attack(hand_index, monster_index)
+                self._do_first_attack(hand_index, enemy_index)
             case 1:
-                self._do_second_attack(hand_index, monster_index)
+                self._do_second_attack(hand_index, enemy_index)
             case 2:
-                self._do_third_attack(hand_index, monster_index)
+                self._do_third_attack(hand_index, enemy_index)
 
         # check player hand is empty
         self._replenish_player_hand(discard_hand=False)
@@ -163,7 +189,7 @@ class GameOn:
 
     def _game_over_player_wins(self):
         if all(card is None for card in self.dungeon_room):
-            self.console.print("All monsters defeated! You win!")
+            self.console.print("All royals defeated! You win!")
             exit(0)
 
     def _display_game_state(self):
@@ -249,8 +275,8 @@ class GameOn:
                 attack_row.append("-")
         return attack_row
 
-    def _pop_player_card(self, monster_idx: int, hand_idx: int):
-        state_key = str(monster_idx + 1)
+    def _pop_player_card(self, enemy_idx: int, hand_idx: int):
+        state_key = str(enemy_idx + 1)
         if self.player_hand:
             player_card = self.player_hand.pop(hand_idx)
             m = self.game_state[state_key]["m"]
@@ -258,103 +284,100 @@ class GameOn:
             self.game_state[state_key][GameOn.ATTACKS].append(player_card)
 
             logger.debug(
-                "Popped attack card %s on monster card %s",
+                "Popped attack card %s on royal card %s",
                 player_card.to_log(),
                 m.to_log() if m else 'None'
             )
             logger.debug(
-                "Current attacks on Monster %s: %s",
+                "Current attacks on royal %s: %s",
                 m.to_log(),
                 [card.to_log() for card in self.game_state[state_key][GameOn.ATTACKS]]
             )
 
-    def _do_first_attack(self, hand_idx: int, monster_idx: int):
-        state_key = str(monster_idx + 1)
+    def _do_first_attack(self, hand_idx: int, enemy_idx: int):
+        state_key = str(enemy_idx + 1)
         curr_game_state = self.game_state[state_key]
-        curr_monster: Card = curr_game_state["m"]
+        curr_enemy: Card = curr_game_state["m"]
         curr_attacks = curr_game_state[GameOn.ATTACKS]
 
         # first attack can be any card
         if len(curr_attacks) == 0:
             logger.debug(
-                "First attack played on monster %s at no %s",
-                curr_monster.to_log(),
+                "First attack played on royal %s at no %s",
+                curr_enemy.to_log(),
                 state_key,
             )
-            self._pop_player_card(monster_idx, hand_idx)
+            self._pop_player_card(enemy_idx, hand_idx)
     
-    def _do_second_attack(self, hand_idx: int, monster_idx: int):
-        state_key = str(monster_idx + 1)
+    def _do_second_attack(self, hand_idx: int, enemy_idx: int):
+        state_key = str(enemy_idx + 1)
         curr_game_state = self.game_state[state_key]
-        curr_monster: Card = curr_game_state["m"]
+        curr_enemy: Card = curr_game_state["m"]
         curr_attacks = curr_game_state[GameOn.ATTACKS]
 
-        # second attack must sum to at least monster value or be a joker
+        # second attack must sum to at least royal value or be a joker
         if len(curr_attacks) == 1:
             # check if card can be played
             player_card = self.player_hand[hand_idx]
             sum_ = curr_attacks[0].value + player_card.value
-            if sum_ >= curr_monster.value:
+            if sum_ >= curr_enemy.value:
                 logger.debug(
-                    "Second attack played on monster %s at no %s",
-                    curr_monster.to_log(),
+                    "Second attack played on royal %s at no %s",
+                    curr_enemy.to_log(),
                     state_key,
                 )
-                self._pop_player_card(monster_idx, hand_idx)
-                self._state_monster_defeatable(monster_idx)
+                self._pop_player_card(enemy_idx, hand_idx)
+                self._state_enemy_defeatable(enemy_idx)
             else:
                 self.console.print(
-                    f"Attack value insufficient for Monster {monster_idx + 1}. Attack failed."
+                    f"Attack value insufficient for royal {enemy_idx + 1}. Attack failed."
                 )
 
-    def _do_third_attack(self, hand_idx: int, monster_idx: int):
-        state_key = str(monster_idx + 1)
+    def _do_third_attack(self, hand_idx: int, enemy_idx: int):
+        state_key = str(enemy_idx + 1)
         curr_game_state = self.game_state[state_key]
-        curr_monster = curr_game_state["m"]
-        curr_attacks = curr_game_state[GameOn.ATTACKS]
+        curr_enemy = curr_game_state["m"]
 
-        # attacks must be 2 card only, new card should be activation card
-        if len(curr_attacks) == 2:
-            # check if activation condition met
-            sum_ = sum(attack_card.value for attack_card in curr_attacks)
-            if sum_ >= curr_monster.value:
-                new_attack = self.player_hand[hand_idx]
+        new_attack = self.player_hand[hand_idx]
 
-                # match suit or joker for third played card
-                if (
-                    new_attack.suit == curr_monster.suit
-                    or new_attack.rank == RANK.JOKER
-                ):
-                    logger.debug(
-                        "Activation card played on monster %s at no %s",
-                        curr_monster.to_log(),
-                        state_key,
-                    )
-                    self.console.print(
-                        f"Activation card played on Monster {monster_idx + 1}!"
-                    )
-                    self.console.print(f"Monster {monster_idx + 1} defeated!")
-                    self._pop_player_card(monster_idx, hand_idx)
+        # match suit or joker for third played card
+        if new_attack.suit != curr_enemy.suit or new_attack.rank != RANK.JOKER:
+            self.console.print(
+                f"Activation card suit does not match enemy's suit {enemy_idx + 1}. Activation failed."
+            )
+            return
 
-                    # draw new royal card to dungeon room
-                    m = None
-                    if self.royal_deck:
-                        m = self.royal_deck.pop()
+        logger.debug(
+            "Activation card played on royal %s at no %s",
+            curr_enemy.to_log(),
+            state_key,
+        )
+        self.console.print(
+            f"Activation card played on royal {enemy_idx + 1}!"
+        )
+        self.console.print(f"Royal {enemy_idx + 1} defeated!")
 
-                    logger.debug(
-                        "Drew new monster card: %s into dungeon room slot %s.",
-                        m.to_log() if m else 'X',
-                        monster_idx + 1
-                    )
-                    self.dungeon_room[monster_idx] = m
-                    self.game_state[state_key] = {"m": m, GameOn.ATTACKS: []}
-                else:
-                    self.console.print(
-                        f"Activation card suit does not match Monster {monster_idx + 1}. Activation failed."
-                    )
+        self._pop_player_card(enemy_idx, hand_idx)
+        self._draw_new_royal(state_key, enemy_idx)
+        
 
-    def _state_monster_defeatable(self, monster_idx):
-        state_key = str(monster_idx + 1)
+    def _draw_new_royal(self, state_key, enemy_idx):
+        m = None
+        if self.royal_deck:
+            m = self.royal_deck.pop()
+
+        logger.debug(
+            "Drew new royal card: %s into dungeon room slot %s.",
+            m.to_log() if m else 'X',
+            state_key
+        )
+
+        # reset game state with new enemy
+        self.dungeon_room[enemy_idx] = m
+        self.game_state[state_key] = {"m": m, GameOn.ATTACKS: []}
+        
+    def _state_enemy_defeatable(self, enemy_idx: int):
+        state_key = str(enemy_idx + 1)
         game_state = self.game_state[state_key]
 
         if (
@@ -362,9 +385,10 @@ class GameOn:
             >= game_state["m"].value
         ):
             self.game_state[state_key]["m"].enabled = True
+            royal_card = self.dungeon_room[enemy_idx]
             logger.debug(
-                "Monster card %s is now defeatable.",
-                self.dungeon_room[monster_idx].to_log()
+                "Royal card %s is now defeatable.",
+                royal_card.to_log() if royal_card else 'X'
             )
             # for x in self.game_state[f"{state_idx + 1}"][GameOn.ATTACKS]:
             #     x.enabled = True
