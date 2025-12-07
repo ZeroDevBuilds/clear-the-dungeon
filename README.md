@@ -2,7 +2,7 @@
 
 Based on this video by Riffle Shuffle & Roll -> https://youtu.be/GbEkAfCqfTM?si=yvGkOyPQFhplO2d_
 
-python text based game.
+terminal text based game
 
 ## How to run the game
 
